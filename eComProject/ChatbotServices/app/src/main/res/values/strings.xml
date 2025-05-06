@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">BTL</string>
+    <string name="hint_message">Nhập tin nhắn...</string>
+    <string name="send_message">Gửi</string>
+</resources>
