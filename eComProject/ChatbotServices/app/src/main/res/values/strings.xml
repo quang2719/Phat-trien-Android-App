@@ -2,4 +2,8 @@
     <string name="app_name">BTL</string>
     <string name="hint_message">Nhập tin nhắn...</string>
     <string name="send_message">Gửi</string>
+    <string name="chat_history">Lịch sử chat</string>
+    <string name="no_history">Không có lịch sử chat</string>
+    <string name="new_chat">Đoạn chat mới</string>
 </resources>
+

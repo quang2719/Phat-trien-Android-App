@@ -33,6 +33,7 @@ public class MainActivity extends AppCompatActivity {
     private List<ChatMessage> chatMessages;
     private ChatbotEngine chatbotEngine;
     private ChatbotDatabase chatbotDatabase;
+    private int currentSessionId = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,6 +42,11 @@ public class MainActivity extends AppCompatActivity {
         
         // Kiểm tra xem layout đã được load đúng chưa
         Log.d("MainActivity", "Layout loaded: " + R.layout.activity_main);
+        
+        // Lấy session_id từ intent nếu có
+        if (getIntent().hasExtra("session_id")) {
+            currentSessionId = getIntent().getIntExtra("session_id", 1);
+        }
         
         // Khởi tạo các thành phần UI
         initializeUI();
@@ -83,7 +89,7 @@ public class MainActivity extends AppCompatActivity {
         chatbotDatabase = new ChatbotDatabase(this);
         
         // Lấy lịch sử chat từ database
-        chatMessages = chatbotDatabase.getAllMessages();
+        chatMessages = chatbotDatabase.getAllMessages(currentSessionId);
         if (chatMessages == null) {
             chatMessages = new ArrayList<>();
         }
@@ -102,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
         // Thêm tin nhắn chào mừng nếu không có lịch sử chat
         if (chatMessages.isEmpty()) {
             String welcomeMessage = "Xin chào! Tôi là Omen, trợ lý ảo của bạn. Tôi có thể giúp gì cho bạn?";
-            chatbotDatabase.addMessage(welcomeMessage, "bot");
+            chatbotDatabase.addMessage(welcomeMessage, "bot", currentSessionId);
             chatMessages.add(new ChatMessage(welcomeMessage, "bot"));
             chatAdapter.notifyItemInserted(chatMessages.size() - 1);
         }
@@ -122,21 +128,80 @@ public class MainActivity extends AppCompatActivity {
         }
         
         if (newChatButton != null) {
-            newChatButton.setOnClickListener(v -> clearChatHistory());
+            newChatButton.setOnClickListener(v -> createNewChat());
         }
         
         if (historyButton != null) {
-            historyButton.setOnClickListener(v -> {
-                // Hiển thị lịch sử chat (có thể thêm chức năng này sau)
-            });
+            historyButton.setOnClickListener(v -> openChatHistory());
         }
+    }
+
+    private void createNewChat() {
+        // Lưu tiêu đề cho session hiện tại dựa trên tin nhắn đầu tiên của người dùng
+        if (!chatMessages.isEmpty()) {
+            String title = "";
+            for (ChatMessage message : chatMessages) {
+                if ("user".equals(message.getSender())) {
+                    title = message.getMessage();
+                    break;
+                }
+            }
+            
+            if (title.isEmpty()) {
+                title = "Chat mới";
+            } else if (title.length() > 20) {
+                // Cắt tiêu đề nếu quá dài và thêm dấu "..."
+                title = title.substring(0, 20) + "...";
+            }
+            
+            chatbotDatabase.updateSessionTitle(currentSessionId, title);
+        }
+        
+        // Tạo session mới
+        currentSessionId = chatbotDatabase.createNewSession("Chat mới");
+        
+        // Xóa tin nhắn hiện tại
+        chatMessages.clear();
+        chatAdapter.notifyDataSetChanged();
+        
+        // Thêm tin nhắn chào mừng
+        String welcomeMessage = "Xin chào! Tôi là Omen, trợ lý ảo của bạn. Tôi có thể giúp gì cho bạn?";
+        chatbotDatabase.addMessage(welcomeMessage, "bot", currentSessionId);
+        chatMessages.add(new ChatMessage(welcomeMessage, "bot"));
+        chatAdapter.notifyItemInserted(chatMessages.size() - 1);
+    }
+
+    private void openChatHistory() {
+        // Lưu tiêu đề cho session hiện tại trước khi chuyển sang màn hình lịch sử
+        if (!chatMessages.isEmpty()) {
+            String title = "";
+            for (ChatMessage message : chatMessages) {
+                if ("user".equals(message.getSender())) {
+                    title = message.getMessage();
+                    break;
+                }
+            }
+            
+            if (title.isEmpty()) {
+                title = "Chat mới";
+            } else if (title.length() > 20) {
+                // Cắt tiêu đề nếu quá dài và thêm dấu "..."
+                title = title.substring(0, 20) + "...";
+            }
+            
+            chatbotDatabase.updateSessionTitle(currentSessionId, title);
+        }
+        
+        // Mở màn hình lịch sử chat
+        Intent intent = new Intent(this, ChatHistoryActivity.class);
+        startActivity(intent);
     }
 
     private void sendMessage() {
         String messageText = messageEditText.getText().toString().trim();
         if (!messageText.isEmpty()) {
             // Lưu tin nhắn người dùng
-            chatbotDatabase.addMessage(messageText, "user");
+            chatbotDatabase.addMessage(messageText, "user", currentSessionId);
             ChatMessage userMessage = new ChatMessage(messageText, "user");
             chatMessages.add(userMessage);
             chatAdapter.notifyItemInserted(chatMessages.size() - 1);
@@ -163,7 +228,7 @@ public class MainActivity extends AppCompatActivity {
                             chatAdapter.notifyItemRemoved(chatMessages.size());
                             
                             // Lưu tin nhắn bot
-                            chatbotDatabase.addMessage(response, "bot");
+                            chatbotDatabase.addMessage(response, "bot", currentSessionId);
                             ChatMessage botMessage = new ChatMessage(response, "bot");
                             chatMessages.add(botMessage);
                             chatAdapter.notifyItemInserted(chatMessages.size() - 1);
@@ -182,13 +247,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void clearChatHistory() {
-        chatbotDatabase.clearAllMessages();
+        chatbotDatabase.clearSessionMessages(currentSessionId);
         chatMessages.clear();
         chatAdapter.notifyDataSetChanged();
         
         // Thêm tin nhắn chào mừng
         String welcomeMessage = "Xin chào! Tôi là Omen, trợ lý ảo của bạn. Tôi có thể giúp gì cho bạn?";
-        chatbotDatabase.addMessage(welcomeMessage, "bot");
+        chatbotDatabase.addMessage(welcomeMessage, "bot", currentSessionId);
         chatMessages.add(new ChatMessage(welcomeMessage, "bot"));
         chatAdapter.notifyItemInserted(chatMessages.size() - 1);
     }
@@ -196,7 +261,25 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (chatbotDatabase != null) {
+        
+        // Lưu tiêu đề cho session hiện tại trước khi thoát
+        if (chatbotDatabase != null && !chatMessages.isEmpty()) {
+            String title = "";
+            for (ChatMessage message : chatMessages) {
+                if ("user".equals(message.getSender())) {
+                    title = message.getMessage();
+                    break;
+                }
+            }
+            
+            if (title.isEmpty()) {
+                title = "Chat mới";
+            } else if (title.length() > 20) {
+                // Cắt tiêu đề nếu quá dài và thêm dấu "..."
+                title = title.substring(0, 20) + "...";
+            }
+            
+            chatbotDatabase.updateSessionTitle(currentSessionId, title);
             chatbotDatabase.close();
         }
     }
