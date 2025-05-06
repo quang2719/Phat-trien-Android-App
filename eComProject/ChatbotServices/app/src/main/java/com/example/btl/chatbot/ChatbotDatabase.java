@@ -11,18 +11,23 @@ import java.util.List;
 
 public class ChatbotDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "chatbot.db";
-    private static final int DATABASE_VERSION = 1;
+    private static final int DATABASE_VERSION = 2; // Tăng phiên bản lên 2
     
+    // Tên bảng
     private static final String TABLE_MESSAGES = "messages";
+    private static final String TABLE_SESSIONS = "sessions";
+    
+    // Cột chung
     private static final String COLUMN_ID = "id";
+    
+    // Cột cho bảng messages
     private static final String COLUMN_MESSAGE = "message";
     private static final String COLUMN_SENDER = "sender";
     private static final String COLUMN_TIMESTAMP = "timestamp";
-    private static final String COLUMN_SESSION_ID = "session_id";
+    private static final String COLUMN_MESSAGE_SESSION_ID = "session_id";
     
-    // Thêm các hằng số cho bảng chat_sessions
-    private static final String TABLE_SESSIONS = "chat_sessions";
-    private static final String COLUMN_SESSION_ID = "session_id";
+    // Cột cho bảng sessions
+    private static final String COLUMN_SESSION_ID = "id";
     private static final String COLUMN_SESSION_TITLE = "title";
     private static final String COLUMN_SESSION_DATE = "date";
     
@@ -32,33 +37,81 @@ public class ChatbotDatabase extends SQLiteOpenHelper {
     
     @Override
     public void onCreate(SQLiteDatabase db) {
-        String createMessagesTable = "CREATE TABLE " + TABLE_MESSAGES + " ("
-                + COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
-                + COLUMN_MESSAGE + " TEXT, "
-                + COLUMN_SENDER + " TEXT, "
-                + COLUMN_TIMESTAMP + " TEXT, "
-                + COLUMN_SESSION_ID + " INTEGER)";
-        
-        String createSessionsTable = "CREATE TABLE " + TABLE_SESSIONS + " ("
-                + COLUMN_SESSION_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
-                + COLUMN_SESSION_TITLE + " TEXT, "
-                + COLUMN_SESSION_DATE + " TEXT)";
-        
-        db.execSQL(createMessagesTable);
+        // Tạo bảng sessions
+        String createSessionsTable = "CREATE TABLE " + TABLE_SESSIONS + "("
+                + COLUMN_SESSION_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + COLUMN_SESSION_TITLE + " TEXT,"
+                + COLUMN_SESSION_DATE + " INTEGER"
+                + ")";
         db.execSQL(createSessionsTable);
         
+        // Tạo bảng messages
+        String createMessagesTable = "CREATE TABLE " + TABLE_MESSAGES + "("
+                + COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + COLUMN_MESSAGE + " TEXT,"
+                + COLUMN_SENDER + " TEXT,"
+                + COLUMN_TIMESTAMP + " INTEGER,"
+                + COLUMN_MESSAGE_SESSION_ID + " INTEGER,"
+                + "FOREIGN KEY(" + COLUMN_MESSAGE_SESSION_ID + ") REFERENCES " + TABLE_SESSIONS + "(" + COLUMN_SESSION_ID + ")"
+                + ")";
+        db.execSQL(createMessagesTable);
+        
         // Tạo session mặc định
-        ContentValues values = new ContentValues();
-        values.put(COLUMN_SESSION_TITLE, "Chat mới");
-        values.put(COLUMN_SESSION_DATE, System.currentTimeMillis());
-        db.insert(TABLE_SESSIONS, null, values);
+        ContentValues sessionValues = new ContentValues();
+        sessionValues.put(COLUMN_SESSION_TITLE, "Chat mới");
+        sessionValues.put(COLUMN_SESSION_DATE, System.currentTimeMillis());
+        db.insert(TABLE_SESSIONS, null, sessionValues);
     }
     
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_MESSAGES);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_SESSIONS);
-        onCreate(db);
+        if (oldVersion < 2) {
+            // Nếu đang nâng cấp từ phiên bản 1 lên 2, thêm cột session_id vào bảng messages
+            try {
+                // Tạo bảng sessions nếu chưa tồn tại
+                String createSessionsTable = "CREATE TABLE IF NOT EXISTS " + TABLE_SESSIONS + "("
+                        + COLUMN_SESSION_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                        + COLUMN_SESSION_TITLE + " TEXT,"
+                        + COLUMN_SESSION_DATE + " INTEGER"
+                        + ")";
+                db.execSQL(createSessionsTable);
+                
+                // Kiểm tra xem cột session_id đã tồn tại trong bảng messages chưa
+                Cursor cursor = db.rawQuery("PRAGMA table_info(" + TABLE_MESSAGES + ")", null);
+                boolean hasSessionIdColumn = false;
+                if (cursor != null) {
+                    int nameIndex = cursor.getColumnIndex("name");
+                    while (cursor.moveToNext()) {
+                        String columnName = cursor.getString(nameIndex);
+                        if (COLUMN_MESSAGE_SESSION_ID.equals(columnName)) {
+                            hasSessionIdColumn = true;
+                            break;
+                        }
+                    }
+                    cursor.close();
+                }
+                
+                // Nếu chưa có cột session_id, thêm vào
+                if (!hasSessionIdColumn) {
+                    db.execSQL("ALTER TABLE " + TABLE_MESSAGES + " ADD COLUMN " + COLUMN_MESSAGE_SESSION_ID + " INTEGER DEFAULT 1");
+                }
+                
+                // Tạo session mặc định nếu chưa có
+                cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_SESSIONS, null);
+                if (cursor != null && cursor.moveToFirst() && cursor.getInt(0) == 0) {
+                    ContentValues sessionValues = new ContentValues();
+                    sessionValues.put(COLUMN_SESSION_TITLE, "Chat mới");
+                    sessionValues.put(COLUMN_SESSION_DATE, System.currentTimeMillis());
+                    db.insert(TABLE_SESSIONS, null, sessionValues);
+                }
+                if (cursor != null) {
+                    cursor.close();
+                }
+            } catch (Exception e) {
+                // Xử lý ngoại lệ nếu có
+                e.printStackTrace();
+            }
+        }
     }
     
     public void addMessage(String message, String sender) {
@@ -71,7 +124,7 @@ public class ChatbotDatabase extends SQLiteOpenHelper {
         values.put(COLUMN_MESSAGE, message);
         values.put(COLUMN_SENDER, sender);
         values.put(COLUMN_TIMESTAMP, System.currentTimeMillis());
-        values.put(COLUMN_SESSION_ID, sessionId);
+        values.put(COLUMN_MESSAGE_SESSION_ID, sessionId);
         db.insert(TABLE_MESSAGES, null, values);
         db.close();
     }
@@ -83,7 +136,7 @@ public class ChatbotDatabase extends SQLiteOpenHelper {
     public List<ChatMessage> getAllMessages(int sessionId) {
         List<ChatMessage> messageList = new ArrayList<>();
         String selectQuery = "SELECT * FROM " + TABLE_MESSAGES
-                + " WHERE " + COLUMN_SESSION_ID + " = " + sessionId
+                + " WHERE " + COLUMN_MESSAGE_SESSION_ID + " = " + sessionId
                 + " ORDER BY " + COLUMN_TIMESTAMP + " ASC";
         
         SQLiteDatabase db = this.getReadableDatabase();
@@ -187,11 +240,14 @@ public class ChatbotDatabase extends SQLiteOpenHelper {
     // Thêm phương thức để xóa tất cả tin nhắn trong một session
     public void clearSessionMessages(int sessionId) {
         SQLiteDatabase db = this.getWritableDatabase();
-        db.delete(TABLE_MESSAGES, COLUMN_SESSION_ID + " = ?", 
+        db.delete(TABLE_MESSAGES, COLUMN_MESSAGE_SESSION_ID + " = ?", 
                   new String[]{String.valueOf(sessionId)});
         db.close();
     }
 }
+
+
+
 
 
 
