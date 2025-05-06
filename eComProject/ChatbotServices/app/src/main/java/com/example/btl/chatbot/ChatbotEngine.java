@@ -2,6 +2,7 @@ package com.example.btl.chatbot;
 
 import android.content.Context;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -30,27 +31,6 @@ public class ChatbotEngine {
             "Chào bạn! Rất vui được gặp bạn.",
             "Xin chào, tôi có thể giúp gì cho bạn hôm nay?"
         });
-        
-        // Các câu hỏi về Omen
-        responses.put("omen", new String[]{
-            "Tôi là Omen, một nhân vật trong game Valorant.",
-            "Omen là một đặc vụ bí ẩn với khả năng dịch chuyển và tạo màn sương.",
-            "Tôi có thể dịch chuyển và tạo màn sương để hỗ trợ đồng đội."
-        });
-        
-        // Các câu hỏi về game
-        responses.put("game", new String[]{
-            "Valorant là một game bắn súng chiến thuật 5v5 của Riot Games.",
-            "Trong Valorant, bạn có thể chọn nhiều đặc vụ khác nhau với khả năng độc đáo.",
-            "Bạn có thể chơi nhiều chế độ khác nhau như Unrated, Competitive, Spike Rush, và Deathmatch."
-        });
-        
-        // Câu trả lời mặc định
-        responses.put("default", new String[]{
-            "Tôi không hiểu ý bạn. Bạn có thể nói rõ hơn được không?",
-            "Xin lỗi, tôi không hiểu câu hỏi của bạn.",
-            "Tôi đang học hỏi thêm. Bạn có thể hỏi điều khác không?"
-        });
     }
 
     public interface ResponseCallback {
@@ -58,6 +38,10 @@ public class ChatbotEngine {
     }
 
     public void generateResponse(String userMessage, final ResponseCallback callback) {
+        generateResponse(userMessage, null, callback);
+    }
+
+    public void generateResponse(String userMessage, List<ChatMessage> chatHistory, final ResponseCallback callback) {
         if (useLocalResponses || !NetworkUtils.isNetworkAvailable(context)) {
             // Sử dụng phản hồi cục bộ nếu không có kết nối internet
             String response = generateLocalResponse(userMessage);
@@ -67,35 +51,44 @@ public class ChatbotEngine {
             callback.onResponseGenerated(response);
         } else {
             // Sử dụng API bên ngoài
-            apiClient.sendMessage(userMessage, new ChatbotApiClient.ChatbotApiCallback() {
-                @Override
-                public void onResponse(String response) {
-                    callback.onResponseGenerated(response);
-                }
+            if (chatHistory != null && !chatHistory.isEmpty()) {
+                // Gửi lịch sử chat nếu có
+                apiClient.sendMessageWithHistory(chatHistory, new ChatbotApiClient.ChatbotApiCallback() {
+                    @Override
+                    public void onResponse(String response) {
+                        callback.onResponseGenerated(response);
+                    }
 
-                @Override
-                public void onError(String error) {
-                    // Fallback to local response if API fails
-                    String response = generateLocalResponse(userMessage);
-                    callback.onResponseGenerated("API Error: " + error + ". Fallback: " + response);
-                }
-            });
+                    @Override
+                    public void onError(String error) {
+                        // Fallback to local response if API fails
+                        String response = generateLocalResponse(userMessage);
+                        callback.onResponseGenerated("API Error: " + error + ". Fallback: " + response);
+                    }
+                });
+            } else {
+                // Gửi tin nhắn đơn nếu không có lịch sử
+                apiClient.sendMessage(userMessage, new ChatbotApiClient.ChatbotApiCallback() {
+                    @Override
+                    public void onResponse(String response) {
+                        callback.onResponseGenerated(response);
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                        // Fallback to local response if API fails
+                        String response = generateLocalResponse(userMessage);
+                        callback.onResponseGenerated("API Error: " + error + ". Fallback: " + response);
+                    }
+                });
+            }
         }
     }
 
     private String generateLocalResponse(String userMessage) {
         userMessage = userMessage.toLowerCase().trim();
-        
         // Kiểm tra từ khóa trong tin nhắn của người dùng
-        if (userMessage.contains("xin chào") || userMessage.contains("chào") || userMessage.contains("hello") || userMessage.contains("hi")) {
-            return getRandomResponse("hello");
-        } else if (userMessage.contains("omen") || userMessage.contains("bạn là ai")) {
-            return getRandomResponse("omen");
-        } else if (userMessage.contains("game") || userMessage.contains("valorant") || userMessage.contains("chơi")) {
-            return getRandomResponse("game");
-        } else {
-            return getRandomResponse("default");
-        }
+        return getRandomResponse("hello");
     }
 
     private String getRandomResponse(String key) {
@@ -104,6 +97,7 @@ public class ChatbotEngine {
         return possibleResponses[index];
     }
 }
+
 
 
 

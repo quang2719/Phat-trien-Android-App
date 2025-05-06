@@ -217,8 +217,12 @@ public class MainActivity extends AppCompatActivity {
             chatAdapter.notifyItemInserted(chatMessages.size() - 1);
             scrollToBottom();
             
-            // Tạo phản hồi từ chatbot
-            chatbotEngine.generateResponse(messageText, new ChatbotEngine.ResponseCallback() {
+            // Tạo phản hồi từ chatbot với lịch sử chat
+            // Lấy lịch sử chat hiện tại (không bao gồm tin nhắn "đang nhập...")
+            List<ChatMessage> chatHistory = new ArrayList<>(chatMessages);
+            chatHistory.remove(chatHistory.size() - 1); // Xóa tin nhắn "đang nhập..."
+            
+            chatbotEngine.generateResponse(messageText, chatHistory, new ChatbotEngine.ResponseCallback() {
                 @Override
                 public void onResponseGenerated(String response) {
                     runOnUiThread(new Runnable() {

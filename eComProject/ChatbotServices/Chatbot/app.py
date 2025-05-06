@@ -26,10 +26,26 @@ def chat():
         if not user_message:
             return jsonify({"error": "No message provided"}), 400
         
+        print('message received: \n', user_message)
+        
         # Gọi Gemini API
         model = genai.GenerativeModel("gemini-2.5-flash-preview-04-17")
         chat = model.start_chat(history=[])
-        response = chat.send_message(f"Trả lời bằng tiếng Việt, ngắn gọn: {user_message}")
+        
+        # Nếu tin nhắn có định dạng lịch sử chat (có nhiều dòng với "User:" và "Chatbot:")
+        if "User:" in user_message and "Chatbot:" in user_message:
+            # Sử dụng lịch sử chat để tạo ngữ cảnh tốt hơn
+            prompt = f"""
+            Dưới đây là lịch sử cuộc trò chuyện giữa người dùng và chatbot:
+            
+            {user_message}
+            
+            Hãy trả lời câu hỏi/yêu cầu cuối cùng của người dùng một cách ngắn gọn, hữu ích và bằng tiếng Việt.
+            """
+            response = chat.send_message(prompt)
+        else:
+            # Nếu chỉ là tin nhắn đơn, xử lý như trước
+            response = chat.send_message(f"Trả lời bằng tiếng Việt, ngắn gọn: {user_message}")
         
         # Trả về kết quả
         return jsonify({"response": response.text})
@@ -43,4 +59,5 @@ def health_check():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
 
