@@ -5,5 +5,11 @@
     <string name="chat_history">Lịch sử chat</string>
     <string name="no_history">Không có lịch sử chat</string>
     <string name="new_chat">Đoạn chat mới</string>
+    <string name="delete_chat">Xóa đoạn chat</string>
+    <string name="delete_chat_confirm">Bạn có chắc chắn muốn xóa đoạn chat này?</string>
+    <string name="delete">Xóa</string>
+    <string name="cancel">Hủy</string>
+    <string name="deleted">Đã xóa đoạn chat</string>
 </resources>
+
 

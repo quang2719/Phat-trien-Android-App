@@ -244,7 +244,44 @@ public class ChatbotDatabase extends SQLiteOpenHelper {
                   new String[]{String.valueOf(sessionId)});
         db.close();
     }
+
+    /**
+     * Xóa một session và tất cả tin nhắn liên quan
+     * @param sessionId ID của session cần xóa
+     * @return true nếu xóa thành công, false nếu có lỗi
+     */
+    public boolean deleteSession(int sessionId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        boolean success = false;
+        
+        try {
+            // Bắt đầu transaction
+            db.beginTransaction();
+            
+            // Xóa tất cả tin nhắn của session
+            db.delete(TABLE_MESSAGES, COLUMN_MESSAGE_SESSION_ID + " = ?", 
+                      new String[]{String.valueOf(sessionId)});
+            
+            // Xóa session
+            int rowsAffected = db.delete(TABLE_SESSIONS, COLUMN_SESSION_ID + " = ?", 
+                                         new String[]{String.valueOf(sessionId)});
+            
+            // Đánh dấu transaction thành công
+            db.setTransactionSuccessful();
+            
+            success = rowsAffected > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            // Kết thúc transaction
+            db.endTransaction();
+        }
+        
+        return success;
+    }
 }
+
+
 
 
 

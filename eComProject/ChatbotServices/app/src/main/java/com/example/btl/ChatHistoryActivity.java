@@ -1,10 +1,12 @@
 package com.example.btl;
 
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
@@ -23,6 +25,7 @@ public class ChatHistoryActivity extends AppCompatActivity implements ChatHistor
     private TextView emptyView;
     private ChatbotDatabase chatbotDatabase;
     private List<ChatSession> sessions;
+    private ChatHistoryAdapter adapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,7 +58,7 @@ public class ChatHistoryActivity extends AppCompatActivity implements ChatHistor
             emptyView.setVisibility(View.GONE);
             historyRecyclerView.setVisibility(View.VISIBLE);
             
-            ChatHistoryAdapter adapter = new ChatHistoryAdapter(sessions, this);
+            adapter = new ChatHistoryAdapter(sessions, this);
             historyRecyclerView.setAdapter(adapter);
             historyRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         }
@@ -67,6 +70,30 @@ public class ChatHistoryActivity extends AppCompatActivity implements ChatHistor
         intent.putExtra("session_id", session.getId());
         startActivity(intent);
         finish();
+    }
+    
+    @Override
+    public void onDeleteClick(ChatSession session, int position) {
+        new AlertDialog.Builder(this)
+            .setTitle("Xóa đoạn chat")
+            .setMessage("Bạn có chắc chắn muốn xóa đoạn chat này?")
+            .setPositiveButton("Xóa", (dialog, which) -> {
+                // Xóa session và tất cả tin nhắn liên quan
+                chatbotDatabase.deleteSession(session.getId());
+                
+                // Cập nhật UI
+                adapter.removeItem(position);
+                
+                // Kiểm tra nếu không còn session nào
+                if (adapter.getItemCount() == 0) {
+                    emptyView.setVisibility(View.VISIBLE);
+                    historyRecyclerView.setVisibility(View.GONE);
+                }
+                
+                Toast.makeText(this, "Đã xóa đoạn chat", Toast.LENGTH_SHORT).show();
+            })
+            .setNegativeButton("Hủy", null)
+            .show();
     }
 
     @Override
@@ -86,3 +113,6 @@ public class ChatHistoryActivity extends AppCompatActivity implements ChatHistor
         }
     }
 }
+
+
+

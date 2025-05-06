@@ -3,6 +3,7 @@ package com.example.btl.adapter;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -20,6 +21,7 @@ public class ChatHistoryAdapter extends RecyclerView.Adapter<ChatHistoryAdapter.
 
     public interface OnSessionClickListener {
         void onSessionClick(ChatSession session);
+        void onDeleteClick(ChatSession session, int position);
     }
 
     public ChatHistoryAdapter(List<ChatSession> sessions, OnSessionClickListener listener) {
@@ -46,21 +48,34 @@ public class ChatHistoryAdapter extends RecyclerView.Adapter<ChatHistoryAdapter.
                 listener.onSessionClick(session);
             }
         });
+        
+        holder.deleteButton.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onDeleteClick(session, holder.getAdapterPosition());
+            }
+        });
     }
 
     @Override
     public int getItemCount() {
         return sessions.size();
     }
+    
+    public void removeItem(int position) {
+        sessions.remove(position);
+        notifyItemRemoved(position);
+    }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
         TextView titleTextView;
         TextView dateTextView;
+        ImageButton deleteButton;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             titleTextView = itemView.findViewById(R.id.sessionTitle);
             dateTextView = itemView.findViewById(R.id.sessionDate);
+            deleteButton = itemView.findViewById(R.id.deleteButton);
         }
     }
 }
