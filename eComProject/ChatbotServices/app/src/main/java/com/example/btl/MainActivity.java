@@ -222,6 +222,13 @@ public class MainActivity extends AppCompatActivity {
             List<ChatMessage> chatHistory = new ArrayList<>(chatMessages);
             chatHistory.remove(chatHistory.size() - 1); // Xóa tin nhắn "đang nhập..."
             
+            // Thêm log để debug
+            Log.d("MainActivity", "Sending chat history with " + chatHistory.size() + " messages");
+            for (int i = 0; i < chatHistory.size(); i++) {
+                ChatMessage msg = chatHistory.get(i);
+                Log.d("MainActivity", "Message " + i + ": " + msg.getSender() + " - " + msg.getMessage());
+            }
+            
             chatbotEngine.generateResponse(messageText, chatHistory, new ChatbotEngine.ResponseCallback() {
                 @Override
                 public void onResponseGenerated(String response) {
